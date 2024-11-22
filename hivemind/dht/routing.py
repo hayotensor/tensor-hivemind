@@ -33,6 +33,10 @@ class RoutingTable:
         self.peer_id_to_uid: Dict[PeerID, DHTID] = dict()  # all nodes currently in buckets, including replacements
         self.uid_to_peer_id: Dict[DHTID, PeerID] = dict()  # all nodes currently in buckets, including replacements
 
+        # this is used for applications built on top of hivemind if they want to make updates to nodes
+        # automatically updates timestamp on entry but up to applications to update thereon after
+        self.peer_id_to_last_updated: Dict[PeerID, int] = dict()  # all nodes currently in buckets, including replacements
+
     def get_bucket_index(self, node_id: DHTID) -> int:
         """Get the index of the bucket that the given node would fall into."""
         lower_index, upper_index = 0, len(self.buckets)
@@ -62,6 +66,8 @@ class RoutingTable:
             # if we added node to bucket or as a replacement, throw it into lookup dicts as well
             self.uid_to_peer_id[node_id] = peer_id
             self.peer_id_to_uid[peer_id] = node_id
+            if self.peer_id_to_last_updated[peer_id] is None:
+                self.peer_id_to_last_updated[peer_id] = get_dht_time()
 
         if not store_success:
             # Per section 4.2 of paper, split if the bucket has node's own id in its range
@@ -104,6 +110,7 @@ class RoutingTable:
         node_peer_id = self.uid_to_peer_id.pop(node_id)
         if self.peer_id_to_uid.get(node_peer_id) == node_id:
             del self.peer_id_to_uid[node_peer_id]
+            del self.peer_id_to_last_updated[node_peer_id]
 
     def get_nearest_neighbors(
         self, query_id: DHTID, k: int, exclude: Optional[DHTID] = None
